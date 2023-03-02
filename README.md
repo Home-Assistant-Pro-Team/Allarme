@@ -3,7 +3,7 @@ https://user-images.githubusercontent.com/62516592/217784134-2fa7c4e3-53d5-4c80-
 
 # Allarme
 
-Il pkg è diviso in più cartelle 
+Il pkg è diviso in più cartelle.
 
 I file principali si trovano nella cartella *alarm_control_panel*
 

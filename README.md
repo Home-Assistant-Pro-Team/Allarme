@@ -1,9 +1,11 @@
+`- Version: 1.0 -`
+
 https://user-images.githubusercontent.com/62516592/217784134-2fa7c4e3-53d5-4c80-a358-ac2b9ae5cb4b.mp4
 
 
 # Allarme
 
-Il pkg è diviso in più cartelle.
+Il pkg è diviso in più cartelle 
 
 I file principali si trovano nella cartella *alarm_control_panel*
 
@@ -87,9 +89,9 @@ Ho un led vicino e fuori la porta che mi indica lo stato dell'allarme
 - disattivo away e night 
 - viene eseguito anche il controllo id del cellulare
 #### PERSON
-Ha un doppio funzionamento:
-  - Attivo  e disattiva l'allarme *away* in base alla presenza in casa
-  - Notifica batteria scarica cellulare se allarme attivo in *away*. Di default controlla tutti i dispositivi con app installa ma è possibile scegliere i singoli device inserendolo in group.include_alarm_entities oppure i singoli dispositivi da escludere con group.exclude_alarm_entities (file GERNERAL_ALARM) 
+- Attiva  e disattiva l'allarme *away* in base alla presenza in casa
+- Notifica batteria scarica cellulare se allarme attivo in *away*.
+- Se allarme NON inserito ed in casa è presente solo una persona e lo stato della batteria è minore del (input_number.alarm_battery_mobile) disattiva l'attivazione automatica dell'allarme fino al quando non aumentano le persone in casa o la batteria torna sopra il 10 (input_boolean.presence_person_active_alarm). 
 #### REAL_IMPUT_ALARM: *DEPRECATO FILE SOSTITUITO DA CARTELLA DETACHED* 
 Utile a chi non vuole usare detached o non ha dispositivi compatibili
 

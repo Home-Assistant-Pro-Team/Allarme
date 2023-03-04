@@ -2,10 +2,46 @@ homeassistant:
   customize:
     package.node_anchors:
         Allarme: &alarm alarm_control_panel.home_alarm
-        Gruppo famiglia: &famiglia  group.famiglia
         
 #ATTIVA ALLARME GLOBALE E DISATTIVA  IN BASE ALLA PRESENZA IN CASA. 
-# SE ALLARME INSERITO AVVISA CHE SE LA BATTERIA E' INFERIORE AL input_number.alarm_battery_mobile
+# Se l'allarme globale è inserito avvisa se la batteria di un cellualare è scarica (input_number.alarm_battery_mobile)
+# Se allarme NON inserito ed in casa è presente solo una persona e lo stato della batteria è minore del (input_number.alarm_battery_mobile)
+# disattiva l'attivazione automtica dell'allarme fino al qunado non aumentano le persone in casa o la batteria torna sopra il 10 (input_boolean.presence_person_active_alarm).
+
+# INSERIRE NEL TEMPLATE LA PERSONA CON IL SENSORE BATTERIA TELEFONO ASSOCIATO
+
+template:
+  - sensor:
+      - name: Stato famiglia allarme
+        state: >
+          {% set home_battery = [  
+            {'state_home': states('person.marco'),  'battery': states('sensor.cellulare_marco_battery_level')|int(0)},
+            {'state_home': states('person.serena'), 'battery': states('sensor.cellulare_serena_livello_della_batteria')|int(0)},
+          ]%}
+          {% if home_battery| selectattr('state_home', 'eq', 'home')| selectattr('battery', '<', states('input_number.alarm_battery_mobile')|int) |list |count == 1 %}
+          home_battery
+          {% elif home_battery| selectattr('state_home', 'eq', 'home')|list |count == 0 and home_battery| selectattr('battery', '<', states('input_number.alarm_battery_mobile')|int) |list %}
+          not_home_battery
+          {% elif home_battery| selectattr('state_home', 'eq', 'home')|list |count > 0 %}
+          home
+          {% elif home_battery| selectattr('state_home', 'eq', 'home')|list |count == 0 %}
+          not_home
+          {% else %}
+          sconosciuto
+          {%endif%}
+        attributes: 
+          home_battery_name: >
+            {% set home_battery = [  
+             {'state_home': states('person.marco'), 'battery': states('sensor.cellulare_marco_battery_level')|int(0),           'name': states['person.marco'].name},
+             {'state_home': states('person.serena'),'battery': states('sensor.cellulare_serena_livello_della_batteria')|int(0), 'name': states['person.serena'].name},
+            ]%}
+            {{ home_battery| selectattr('state_home', 'eq', 'home')| selectattr('battery', '<', states('input_number.alarm_battery_mobile')|int)|map(attribute='name')|first|default('sconosciuto')}}
+          not_home_battery_name: >
+            {% set home_battery = [  
+              {'state_home': states('person.marco'), 'battery': states('sensor.cellulare_marco_battery_level')|int(0),           'name': states['person.marco'].name},
+              {'state_home': states('person.serena'),'battery': states('sensor.cellulare_serena_livello_della_batteria')|int(0), 'name': states['person.serena'].name},
+            ]%}
+            {{ (home_battery|selectattr('state_home','eq','home')|list |count == 0 and home_battery| selectattr('battery','<', states('input_number.alarm_battery_mobile')|int) |list)|map(attribute='name') |join(', ') |default('sconosciuto')}}
 
 input_number:
   alarm_battery_mobile:
@@ -22,54 +58,45 @@ input_boolean:
   presence_person_active_alarm:
     name: Attiva-Disattiva per presenza in casa
 
-template:
-  - sensor:
-      - name: Allerta batteria mobile per allarme
-        state: >
-          {% set output = namespace(numbers=[]) %}
-          {% set exclude = expand('group.exclude_alarm_entities')|map(attribute='entity_id')|list %}
-          {% set include = expand('group.include_alarm_entities')|map(attribute='entity_id')|list %}
-          {% set filter = states.sensor|selectattr('entity_id','in',include)|selectattr('attributes.device_class','defined')|selectattr('attributes.device_class','eq','battery') %}
-          {% if filter is defined %}
-            {%- for battery in filter if  battery.entity_id in integration_entities('mobile_app') and battery.state|int < states('input_number.alarm_battery_mobile')|int -%}
-              {%- set output.numbers = output.numbers + [battery] -%} 
-          {% else %}
-            {% set filter = states.sensor|rejectattr('entity_id','in',exclude)|selectattr('attributes.device_class','defined')|selectattr('attributes.device_class','eq','battery') %}
-              {%- for battery in filter if  battery.entity_id in integration_entities('mobile_app') and battery.state|int < states('input_number.alarm_battery_mobile')|int -%}
-                {%- set output.numbers = output.numbers + [battery] -%}
-              {% endfor%}
-            {% endfor%}
-          {% endif %}
-            {{output.numbers|count}}
-
 automation:
+
 - alias: Presence person active alarm
-  id: presencepersonactivealarm
+  id: presence_allarm_auto
   initial_state: true
   variables:
     alarm: *alarm 
   trigger:
   - platform: state
-    entity_id: sensor.allerta_batteria_mobile_per_allarme
-    id: battery
-    not_to:
-        - "0"
-  - platform: state
-    entity_id: *famiglia
+    entity_id: sensor.stato_famiglia_allarme
   action:
   - choose:
-
-    - alias: Inserisci allarme globale per famiglia fuori casa
-      conditions:
-      - "{{trigger.to_state.state == 'not_home' and is_state(alarm,'disarmed')}}"
-      - "{{is_state('input_boolean.presence_person_active_alarm','on')}}"
+    - alias: Se attivazione/disattivazione automatica in base alla presenza attiva ed in casa c'è una persona con cellulare scarica 
+      conditions: 
+         - "{{trigger.to_state.state == 'home_battery' and is_state('input_boolean.presence_person_active_alarm','on') and is_state(alarm,'disarmed') and trigger.from_state.state is defined}}"
       sequence:
-      - service: alarm_control_panel.alarm_arm_away
-        target:
-          entity_id: *alarm
+        - alias: Impedisci di inserire allarme globale per batteria scarica con 1 persona in casa
+          service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.presence_person_active_alarm
+        - service: script.notify_allert
+          data: 
+            notification_icon: mdi:alarm-light-outline
+            title: --ALLARME--
+            message: "Mettere in carica il telefono di {{state_attr('sensor.stato_famiglia_allarme','home_battery_name')}}. Attivazione automatica allarme disattivata"
+        - alias: Attendi che la batteria torna sopra il 10% o l'ingresso di altre persone in casa
+          wait_for_trigger:
+            - platform: state
+              entity_id:
+                - sensor.stato_famiglia_allarme
+              to: home
+        - alias: Ripristina attivazione/disattivazione allarme automatico in base alla presenza
+          service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.presence_person_active_alarm
+
     - alias: Togli allarme globale per famiglia tornata a casa
       conditions:
-      - "{{trigger.to_state.state == 'home' and not is_state(alarm,'disarmed')}}"
+      - "{{trigger.to_state.state == 'home' and not (is_state(alarm,'disarmed') or is_state(alarm,'armed_night'))}}"
       - "{{is_state('input_boolean.presence_person_active_alarm','on')}}"
       sequence:
       - service: alarm_control_panel.alarm_disarm
@@ -77,9 +104,10 @@ automation:
           code: !secret alarm_code
         target:
           entity_id: *alarm
+
     - alias: Avvisa cellulari con batteria scarica con allarme globale inserito
       conditions:
-      - "{{trigger.id == 'battery' and is_state(alarm,'armed_away') and  trigger.to_state.state is defined and trigger.from_state.state is defined }}"
+      - "{{trigger.to_state.state == 'not_home_battery' and is_state(alarm,'armed_away') }}"
       - "{{is_state('input_boolean.alarm_battery_mobile','on')}}"
       sequence:
         - service: script.notify_allert
@@ -88,19 +116,13 @@ automation:
             alexa_on: 'false'
             notification_icon: mdi:alarm-light-outline
             title: --ALLARME--
-            message: >
-              {% set output = namespace(numbers=[]) %}
-              {% set exclude = expand('group.exclude_alarm_entities')|map(attribute='entity_id')|list %}
-              {% set include = expand('group.include_alarm_entities')|map(attribute='entity_id')|list %}
-              {% set filter = states.sensor|selectattr('entity_id','in',include)|selectattr('attributes.device_class','defined')|selectattr('attributes.device_class','eq','battery') %}
-              {% if filter is defined %}
-                {%- for battery in filter if  battery.entity_id in integration_entities('mobile_app') and battery.state|int < states('input_number.alarm_battery_mobile')|int -%}
-                  {%- set output.numbers = output.numbers + [battery.name +(' ')+ battery.state+('%') ] -%}
-              {% else %}
-                {% set filter = states.sensor|rejectattr('entity_id','in',exclude)|selectattr('attributes.device_class','defined')|selectattr('attributes.device_class','eq','battery') %}
-                  {%- for battery in filter if  battery.entity_id in integration_entities('mobile_app') and battery.state|int < states('input_number.alarm_battery_mobile')|int -%}
-                    {%- set output.numbers = output.numbers + [battery.name +(' ')+ battery.state+('%') ] -%}
-                  {% endfor%}
-                {% endfor%}
-              {% endif %}
-                {{('Attenzione allarme inserito con: ') + output.numbers|join(', ')}}
+            message: "Attenzione allarme inserito con telefono di {{state_attr('sensor.stato_famiglia_allarme','not_home_battery_name')}} scarico"
+
+    - alias: Inserisci allarme globale per famiglia fuori casa
+      conditions:
+      - "{{trigger.to_state.state == 'not_home' or trigger.to_state.state == 'not_home_battery' }}"
+      - "{{is_state('input_boolean.presence_person_active_alarm','on') and is_state(alarm,'disarmed') }}"
+      sequence:
+      - service: alarm_control_panel.alarm_arm_away
+        target:
+          entity_id: *alarm

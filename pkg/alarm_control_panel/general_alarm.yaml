@@ -1,3 +1,7 @@
+homeassistant:
+  customize:
+    package.node_anchors:
+        Allarme: &alarm alarm_control_panel.home_alarm
 ########################################################################################################################################
 # Creazione allarme
 alarm_control_panel:
@@ -11,10 +15,6 @@ alarm_control_panel:
 
 ########################################################################################################################################
 # Inserire nei gruppi le entity_id da aggiungere o rimuovere al pkg che non vengono viste in automatico 
-# ATTENZIONE PER QUANTO RIGUARDA I SENSORI BATTERY  "file: person": 
-#   - se non inseriti nei gruppi vengono presi tutti i sensori batteria dei device con app installata
-#   - se inseriti in include_alarm_entities il controllo stato batteria verrà effettuato solo su questi
-#   - se inseriri in exclude_alarm_entities il controllo stato batteria avviene su tutti i device con app installata esclusi quelli inseriti
 # PULSANTI FISICI "file: real_input_alarm": 
 #   - E' possibile solo escludere sensori 
 #   -  b che utilizzano "event: shelly.click" non possono essere ne esclusi ne inseriti perchè non esiste l'entità
@@ -35,8 +35,8 @@ group:
   include_alarm_entities: 
     name: Entità da includere per pkg allarme 
     entities:
-      - sensor.cellulare_marco_battery_level
-      - sensor.cellulare_serena_livello_della_batteria
+      # - sensor.cellulare_marco_battery_level
+      # - sensor.cellulare_serena_livello_della_batteria
 ########################################################################################################################################
 input_boolean:
   alarm_triggered_state:
@@ -47,7 +47,7 @@ automation:
   initial_state: true
   mode: single
   trigger:
-  - entity_id: alarm_control_panel.home_alarm
+  - entity_id: *alarm
     platform: state
     to: 
       - 'triggered'

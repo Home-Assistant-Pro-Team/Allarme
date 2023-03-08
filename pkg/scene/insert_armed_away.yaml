@@ -40,7 +40,7 @@ automation:
     then:
       - service: climate.turn_off
         target:
-          entity_id: climate.salone_ac
+          entity_id: climate.condizionatore_salone
   - alias: Spegni Dyson
     if: "{{is_state('fan.salotto','on')}}"
     then:

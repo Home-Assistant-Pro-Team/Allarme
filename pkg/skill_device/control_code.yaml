@@ -58,9 +58,9 @@ template:
       - name: counter_code_error
         state: >
           {% if trigger.entity_id == 'button.confirmed_code_alarm' and not is_state('input_number.control_code_alarm','0.0')%}
-           {{ 1 if states('sensor.counter_code_error') | int(0) == 0 else states('sensor.counter_code_error') | int(0) + 1 }}
+           {{ 1 if this.state| int(0) == 0 else this.state| int(0) + 1 }}
           {% elif trigger.entity_id == 'button.confirmed_code_alarm' and is_state('input_number.control_code_alarm','0.0')%}
-           {{ states('sensor.counter_code_error') | int(0)  }}
+           {{ this.state| int(0)  }}
           {% else  %}
             0
           {% endif %}

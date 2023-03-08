@@ -31,6 +31,9 @@ group:
       - automation.accensione_automatica_studio
       - automation.accendi_libreria_con_porta_aperta
       - automation.notifica_campanello
+      - automation.balcone_cameretta_con_telecomando
+      - automation.telecomando_tenda_tavolo
+      - automation.telecomando_tenda_divano
 
 automation:
 - alias: Azioni personalizzate per allarme globale

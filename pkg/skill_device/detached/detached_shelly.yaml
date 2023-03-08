@@ -152,45 +152,88 @@ template:
             {% else %}
             {{this.attributes.state_btn_type|string +(', ')+ states('sensor.rest_btn_type')|string + type}}
             {%endif%}
+            
 script:
   detached_on:
     alias: Abilita detached
     sequence:
-      - alias: salva stato pulsante impostato sui device
-        repeat:
-          count: "{{state_attr('sensor.detached_list','btn_type')|count}}"
+      - choose:
+        - conditions:
+            - "{{state_attr('script.detached_off','last_triggered') < this.attributes.last_triggered}}"
           sequence:
-            - service: input_number.set_value
+            - service: notify.persistent_notification
               data:
-                value: "{{repeat.index-1}}"
-              target:
-                entity_id: input_number.rest_btn_index
-            - service: homeassistant.update_entity
-              entity_id: sensor.rest_btn_type
-      - alias: abilita detached a tutti i device shelly
-        repeat:
-          count: "{{state_attr('sensor.detached_list','detached_on')|count}}"
+                message: Attenzione eseguire prima disabilita detached
+                title: Detached Shelly
+        - alias:  serve solo per la prima volta caricato il file perchè script detached_off ancora non eseguito
+          conditions:
+          - "{{state_attr('script.detached_off','last_triggered') == none }}"
           sequence:
-            - service: rest_command.detached_shelly
-              data:
-                urls: "{{state_attr('sensor.detached_list','detached_on')[repeat.index-1]}}"
+            - alias: salva stato pulsante impostato sui device
+              repeat:
+                count: "{{state_attr('sensor.detached_list','btn_type')|count}}"
+                sequence:
+                  - service: input_number.set_value
+                    data:
+                      value: "{{repeat.index-1}}"
+                    target:
+                      entity_id: input_number.rest_btn_index
+                  - service: homeassistant.update_entity
+                    entity_id: sensor.rest_btn_type
+            - alias: abilita detached a tutti i device shelly
+              repeat:
+                count: "{{state_attr('sensor.detached_list','detached_on')|count}}"
+                sequence:
+                  - service: rest_command.detached_shelly
+                    data:
+                      urls: "{{state_attr('sensor.detached_list','detached_on')[repeat.index-1]}}"
+        default:
+          - alias: salva stato pulsante impostato sui device
+            repeat:
+              count: "{{state_attr('sensor.detached_list','btn_type')|count}}"
+              sequence:
+                - service: input_number.set_value
+                  data:
+                    value: "{{repeat.index-1}}"
+                  target:
+                    entity_id: input_number.rest_btn_index
+                - service: homeassistant.update_entity
+                  entity_id: sensor.rest_btn_type
+          - alias: abilita detached a tutti i device shelly
+            repeat:
+              count: "{{state_attr('sensor.detached_list','detached_on')|count}}"
+              sequence:
+                - service: rest_command.detached_shelly
+                  data:
+                    urls: "{{state_attr('sensor.detached_list','detached_on')[repeat.index-1]}}"
 
   detached_off:
     alias: Disabilita detached
     sequence:
-      - if: "{{is_state('script.detached_on','on')}}"
-        then:
-          - wait_template: "{{is_state('script.detached_on','off')}}"
-          - repeat:
-              count: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')|count}}"
-              sequence:
-                - service: rest_command.detached_shelly
-                  data:
-                    urls: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')[repeat.index-1]}}"
-        else: 
-          - repeat:
-              count: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')|count}}"
-              sequence:
-                - service: rest_command.detached_shelly
-                  data:
-                    urls: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')[repeat.index-1]}}"
+      - choose:
+        - conditions:
+          - "{{is_state('script.detached_on','on')}}"
+          sequence:
+            - wait_template: "{{is_state('script.detached_on','off')}}"
+            - delay: 
+                seconds: 2 
+            - repeat:
+                count: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')|count}}"
+                sequence:
+                  - service: rest_command.detached_shelly
+                    data:
+                      urls: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')[repeat.index-1]}}"
+        - conditions:
+          - "{{this.attributes.last_triggered > state_attr('script.detached_on','last_triggered')}}"
+          sequence:
+            - service: notify.persistent_notification
+              data:
+                message: Attenzione eseguire prima abilitazione detached
+                title: Detached Shelly
+        default: 
+            - repeat:
+                count: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')|count}}"
+                sequence:
+                  - service: rest_command.detached_shelly
+                    data:
+                      urls: "{{state_attr('sensor.btn_type_list','state_btn_type').split(',')[repeat.index-1]}}"
